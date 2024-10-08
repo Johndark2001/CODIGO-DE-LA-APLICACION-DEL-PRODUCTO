@@ -1,0 +1,86 @@
+
+import socket
+import threading
+import tkinter as tk
+from tkinter.scrolledtext import ScrolledText
+
+def iniciar_cliente():
+    try:
+        cliente_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        cliente_socket.connect(('localhost', 12345))
+
+        pregunta = cliente_socket.recv(1024).decode('utf-8')
+        agregar_mensaje(f"Servidor: {pregunta}")
+        nombre = input_nombre.get()
+        cliente_socket.send(nombre.encode('utf-8'))
+
+        pregunta = cliente_socket.recv(1024).decode('utf-8')
+        agregar_mensaje(f"Servidor: {pregunta}")
+        edad = input_edad.get()
+        cliente_socket.send(edad.encode('utf-8'))
+
+        pregunta = cliente_socket.recv(1024).decode('utf-8')
+        agregar_mensaje(f"Servidor: {pregunta}")
+        correo = input_correo.get()
+        cliente_socket.send(correo.encode('utf-8'))
+
+        confirmacion = cliente_socket.recv(1024).decode('utf-8')
+        agregar_mensaje(f"Servidor: {confirmacion}")
+
+        cliente_socket.close()
+
+    except socket.error as e:
+        agregar_mensaje(f"Error de conexión: {e}")
+
+def agregar_mensaje(mensaje):
+    text_area.config(state=tk.NORMAL)
+    text_area.insert(tk.END, mensaje + "\n")
+    text_area.config(state=tk.DISABLED)
+
+def validar_entradas():
+    nombre = input_nombre.get()
+    edad = input_edad.get()
+    correo = input_correo.get()
+
+    if not nombre:
+        agregar_mensaje("El nombre no puede estar vacío.")
+        return False
+    if not edad.isdigit() or int(edad) <= 0:
+        agregar_mensaje("La edad debe ser un número válido.")
+        return False
+    if "@" not in correo or "." not in correo:
+        agregar_mensaje("El correo no es válido.")
+        return False
+    return True
+
+def enviar_datos():
+    if validar_entradas():
+        agregar_mensaje("Enviando datos al servidor...")
+        cliente_thread = threading.Thread(target=iniciar_cliente)
+        cliente_thread.start()
+
+root = tk.Tk()
+root.title("Cliente - Registro de Evento")
+
+text_area = ScrolledText(root, wrap=tk.WORD, state=tk.DISABLED, width=50, height=20)
+text_area.pack(padx=10, pady=10)
+
+frame = tk.Frame(root)
+frame.pack(padx=10, pady=5)
+
+tk.Label(frame, text="Nombre:").grid(row=0, column=0, padx=5, pady=5)
+input_nombre = tk.Entry(frame, width=30)
+input_nombre.grid(row=0, column=1)
+
+tk.Label(frame, text="Edad:").grid(row=1, column=0, padx=5, pady=5)
+input_edad = tk.Entry(frame, width=30)
+input_edad.grid(row=1, column=1)
+
+tk.Label(frame, text="Correo:").grid(row=2, column=0, padx=5, pady=5)
+input_correo = tk.Entry(frame, width=30)
+input_correo.grid(row=2, column=1)
+
+enviar_btn = tk.Button(root, text="Enviar", command=enviar_datos)
+enviar_btn.pack(padx=10, pady=10)
+
+root.mainloop()

@@ -1,0 +1,98 @@
+
+import socket
+import sqlite3
+import threading
+import tkinter as tk
+from tkinter.scrolledtext import ScrolledText
+
+def inicializar_db():
+    conexion = sqlite3.connect('usuarios.db')
+    cursor = conexion.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS usuarios (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nombre TEXT NOT NULL,
+            edad INTEGER NOT NULL,
+            correo TEXT NOT NULL
+        )
+    ''')
+    conexion.commit()
+    conexion.close()
+
+def guardar_usuario(nombre, edad, correo):
+    with sqlite3.connect('usuarios.db') as conexion:
+        cursor = conexion.cursor()
+        cursor.execute('''
+            INSERT INTO usuarios (nombre, edad, correo)
+            VALUES (?, ?, ?)
+        ''', (nombre, edad, correo))
+        conexion.commit()
+
+def validar_datos(nombre, edad, correo):
+    if not nombre or not nombre.isalpha():
+        return False, "El nombre no puede estar vacío y debe contener solo letras."
+    if not edad.isdigit() or int(edad) <= 0:
+        return False, "La edad debe ser un número mayor que 0."
+    if "@" not in correo or "." not in correo:
+        return False, "El correo no es válido."
+    return True, ""
+
+def iniciar_servidor():
+    try:
+        servidor_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        servidor_socket.bind(('localhost', 12345))
+        servidor_socket.listen(5)
+        agregar_mensaje("Servidor escuchando en el puerto 12345...")
+
+        while True:
+            cliente_socket, direccion_cliente = servidor_socket.accept()
+            agregar_mensaje(f"Conexión establecida con {direccion_cliente}")
+
+            try:
+                cliente_socket.send("¿Cuál es tu nombre?".encode('utf-8'))
+                nombre = cliente_socket.recv(1024).decode('utf-8')
+
+                cliente_socket.send("¿Cuál es tu edad?".encode('utf-8'))
+                edad = cliente_socket.recv(1024).decode('utf-8')
+
+                cliente_socket.send("¿Cuál es tu correo electrónico?".encode('utf-8'))
+                correo = cliente_socket.recv(1024).decode('utf-8')
+
+                es_valido, mensaje = validar_datos(nombre, edad, correo)
+                if not es_valido:
+                    cliente_socket.send(mensaje.encode('utf-8'))
+                    cliente_socket.close()
+                    continue
+
+                guardar_usuario(nombre, edad, correo)
+                agregar_mensaje(f"Datos de {nombre} guardados en la base de datos.")
+
+                confirmacion = f"Gracias {nombre}, de {edad} años. Tu correo {correo} ha sido registrado."
+                cliente_socket.send(confirmacion.encode('utf-8'))
+                agregar_mensaje("Confirmación enviada al cliente.")
+
+            except socket.error as e:
+                agregar_mensaje(f"Error en la conexión: {e}")
+            finally:
+                cliente_socket.close()
+
+    except Exception as e:
+        agregar_mensaje(f"Error en el servidor: {e}")
+
+def agregar_mensaje(mensaje):
+    text_area.config(state=tk.NORMAL)
+    text_area.insert(tk.END, mensaje + "\n")
+    text_area.config(state=tk.DISABLED)
+
+root = tk.Tk()
+root.title("Servidor de Registro")
+
+text_area = ScrolledText(root, wrap=tk.WORD, state=tk.DISABLED, width=50, height=20)
+text_area.pack(padx=10, pady=10)
+
+inicializar_db()
+servidor_thread = threading.Thread(target=iniciar_servidor)
+servidor_thread.daemon = True
+servidor_thread.start()
+
+root.mainloop()
